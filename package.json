@@ -6,7 +6,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node scripts/start",
-    "build": "node scripts/build"
+    "build": "node scripts/build",
+    "serve": "cd dist && serve -p 80"
   },
   "author": "lime",
   "license": "ISC",
