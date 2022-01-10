@@ -1,6 +1,8 @@
 const
   path = require('path'),
-  fs = require('fs')
+  fs = require('fs'),
+  argv = require('minimist')(process.argv.slice(2))
+
 
 const
   webpack = require('webpack'),
@@ -45,11 +47,6 @@ const config = {
       '@pages': path.resolve(root, 'src', 'view', 'pages'),
       '@components': path.resolve(root, 'src', 'view', 'components'),
       '@HOC': path.resolve(root, 'src', 'view', 'HOC'),
-    }
-  },
-  resolveLoader: {
-    alias: {
-      'binding-loader': path.resolve(root, 'config', 'binding-loader.js')
     }
   },
   optimization: {
@@ -114,12 +111,14 @@ const config = {
     }),
     new webpack.DefinePlugin({
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
+      __isProd__
     }),
     new CompressionPlugin({
       test: /^(react).*\.js$/
     }),
-    new BundleAnalyzerPlugin(),
-  ],
+  ].concat(
+    argv['a'] ? new BundleAnalyzerPlugin() : []
+  ),
   module: {
     rules: [
       {
