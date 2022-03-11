@@ -1,25 +1,23 @@
 const
   path = require('path'),
   fs = require('fs'),
-  argv = require('minimist')(process.argv.slice(2))
+  argv = require('minimist')(process.argv.slice(2)),
+  federationConfig = require('./federation.config')
 
 
 const
   webpack = require('webpack'),
   HtmlWebpackPlugin = require('html-webpack-plugin'),
-  HtmlWebpackTagsPlugin = require('html-webpack-tags-plugin'),
   TerserPlugin = require('terser-webpack-plugin'),
-  MergeIntoSingleFilePlugin = require('webpack-merge-and-include-globally'),
-  CompressionPlugin = require("compression-webpack-plugin"),
+  { ModuleFederationPlugin } = require('webpack').container,
   { BundleAnalyzerPlugin } = require('webpack-bundle-analyzer'),
   { presets, plugins } = require('./babel.config')
 
 
-const
+const // constans
   NODE_ENV = process.env.NODE_ENV ?? 'development',
   __isDEV__ = NODE_ENV === 'development',
-  __isProd__ = NODE_ENV === 'production',
-  reactVendorName = 'react-vendor.js'
+  __isProd__ = NODE_ENV === 'production'
 
 const
   root = path.resolve(__dirname, '../'),
@@ -29,7 +27,7 @@ const
 /** @type {import('webpack').Configuration} */
 const config = {
   context: root,
-  entry: './src/view/index.js',
+  entry: path.resolve(root, 'src/view/index.js'),
   bail: true,
   mode: NODE_ENV,
   devtool: !__isProd__ && 'source-map',
@@ -41,6 +39,11 @@ const config = {
       type: 'umd'
     }
   },
+  devServer: {
+    hot: true,
+    port: federationConfig.port,
+  },
+
   resolve: {
     alias: {
       '~': root,
@@ -52,15 +55,15 @@ const config = {
   optimization: {
     splitChunks: {
       chunks: 'async',
-      cacheGroups: {
-        commons: {
-          chunks: 'all',
-          name: "vendors",
-          test: /[\\/]node_modules[\\/]/,
-          priority: -10,
-          reuseExistingChunk: true,
-        },
-      }
+      // cacheGroups: {
+      //   commons: {
+      //     chunks: 'all',
+      //     name: "vendors",
+      //     test: /[\\/]node_modules[\\/]/,
+      //     priority: -10,
+      //     reuseExistingChunk: true,
+      //   },
+      // }
     },
     minimize: __isProd__,
     minimizer: [
@@ -70,13 +73,6 @@ const config = {
       }),
     ]
   },
-  externalsType: 'umd',
-  externals: [
-    {
-      'react': 'React',
-      'react-dom': 'ReactDOM',
-    }
-  ],
   plugins: [
     new HtmlWebpackPlugin({
       inject: true,
@@ -97,24 +93,25 @@ const config = {
         },
       }
     }),
-    new HtmlWebpackTagsPlugin({
-      tags: [reactVendorName],
-      append: false
+    new ModuleFederationPlugin({
+      name: federationConfig.name,
+      filename: federationConfig.name,
+      remotes: federationConfig.remotes,
+      exposes:federationConfig.exposes,
+      shared: Object.assign(
+        {},
+        ...federationConfig.shared.map(([name, version]) => ({
+          [name]: {
+            eager: true,
+            singleton: true,
+            requiredVersion: version
+          }
+        })))
     }),
-    new MergeIntoSingleFilePlugin({
-      files: {
-        [reactVendorName]: [
-          path.resolve(root, 'node_modules', 'react', 'umd', __isProd__ ? 'react.production.min.js' : 'react.development.js'),
-          path.resolve(root, 'node_modules', 'react-dom', 'umd', __isProd__ ? 'react-dom.production.min.js' : 'react-dom.development.js'),
-        ]
-      }
-    }),
+
     new webpack.DefinePlugin({
       'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV),
       __isProd__
-    }),
-    new CompressionPlugin({
-      test: /^(react).*\.js$/
     }),
   ].concat(
     argv['a'] ? new BundleAnalyzerPlugin() : []
